@@ -48,7 +48,7 @@ if df is not None:
                                     index=all_cols.index(find_best(['temp', 'press', 'bhp'], 1)))
     critical_val = st.sidebar.slider("Risk Threshold Value", 0.0, 500.0, 100.0)
 
-    # تنظيف البيانات (التصحيح هنا: التأكد من إغلاق كل الأقواس)
+    # تنظيف البيانات
     df[temp_col] = pd.to_numeric(df[temp_col], errors='coerce')
     df[depth_col] = pd.to_numeric(df[depth_col], errors='coerce')
     df = df.dropna(subset=[temp_col, depth_col])
@@ -94,25 +94,24 @@ if df is not None:
             st.markdown("### 🤖 Decision Support")
             if not danger_zone.empty:
                 st.error("⚠️ DEPOSITION ALERT")
-                st.write(f"The analysis indicates that the well parameters have dropped below the safe threshold of **{critical_val}**.")
+                st.write(f"Parameters dropped below threshold: **{critical_val}**.")
             else:
                 st.success("✅ SYSTEM STABLE")
-                st.write("Current flow parameters are within the safe operating envelope.")
+                st.write("Conditions are within the safe operating envelope.")
 
     with t2:
         st.markdown(f"""
         ### Executive Project Summary
         **Developed by:** Eng. Sulaiman
-        **Objective:** This AI-driven tool monitors real-time production data to prevent Non-Productive Time (NPT) 
+        
+        **Objective:** This AI-driven tool monitors real-time production data to prevent NPT 
         caused by scale, wax, or asphaltene deposition.
         
-        **Methodology:** By cross-referencing bottom-hole temperatures and pressures against thermodynamic envelopes, 
-        the system flags anomalies before they lead to complete wellbore blockage.
+        **Methodology:** Using thermodynamic boundary monitoring to flag anomalies early.
         """)
-        [Image of a diagram showing wax and asphaltene deposition envelopes in oil production]
 
     with t3:
         st.markdown("### Preview of Processed Dataset")
         st.dataframe(df.head(100), use_container_width=True)
 else:
-    st.error("Fatal Error: Could not connect to Data Source. Please check the URL.")
+    st.error("Fatal Error: Could not connect to Data Source.")
