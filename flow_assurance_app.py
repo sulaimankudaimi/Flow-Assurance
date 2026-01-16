@@ -2,116 +2,68 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from datetime import datetime
+import os
 
 # 1. إعدادات الصفحة
 st.set_page_config(page_title="Eng. Sulaiman | Flow Assurance Pro", page_icon="🏗️", layout="wide")
 
-# 2. تصميم الرأس (Header) الاحترافي
+# 2. الهوية الشخصية
 st.markdown("""
     <div style="background-color:#001f3f; padding:30px; border-radius:15px; border-left: 10px solid #ffcc00; margin-bottom:20px">
-        <h1 style="color:white; margin:0; font-family:Arial;">🛡️ Flow Assurance Expert System</h1>
-        <h3 style="color:#ffcc00; margin:10px 0 0 0; font-family:Arial;">Lead Engineer: Eng. Sulaiman</h3>
-        <p style="color:#bdc3c7; font-size:1.1em;">Advanced Real-Time Anomaly Detection | Volve Field Asset Management</p>
+        <h1 style="color:white; margin:0;">🛡️ Flow Assurance Expert System</h1>
+        <h3 style="color:#ffcc00; margin:10px 0 0 0;">Lead Engineer: Eng. Sulaiman</h3>
     </div>
     """, unsafe_allow_html=True)
 
-# 3. جلب البيانات (رابط مباشر لضمان استقرار التطبيق)
-URL = "https://raw.githubusercontent.com/yrahul3910/Volve-Dataset/master/Well_F12_Production_Data.csv"
+# 3. نظام جلب البيانات المرن
+# سنحاول أولاً قراءة الملف إذا كان مرفوعاً على GitHub بجانب الكود
+FILENAME = "Norway-NA-15_47_9-F-9 A depth.csv"
 
-@st.cache_data
-def load_and_clean_data(url):
-    try:
-        df = pd.read_csv(url, low_memory=False)
-        df.columns = df.columns.str.strip()
-        return df
-    except Exception as e:
-        st.error(f"Error connecting to data: {e}")
-        return None
+def load_data():
+    if os.path.exists(FILENAME):
+        return pd.read_csv(FILENAME, low_memory=False)
+    return None
 
-df = load_and_clean_data(URL)
+df = load_data()
+
+# إذا لم يجد الملف، يطلب من المستخدم رفعه يدوياً (كخطة بديلة)
+if df is None:
+    st.warning(f"⚠️ الملف '{FILENAME}' غير موجود في المستودع.")
+    uploaded_file = st.file_uploader("يرجى رفع ملف البيانات (CSV) لتشغيل المنحنيات:", type="csv")
+    if uploaded_file:
+        df = pd.read_csv(uploaded_file)
 
 if df is not None:
+    df.columns = df.columns.str.strip()
     all_cols = df.columns.tolist()
+
+    # القائمة الجانبية
+    st.sidebar.header("⚙️ التحليل الهندسي")
+    y_axis = st.sidebar.selectbox("محور العمق (Y-Axis):", all_cols, index=0)
+    x_axis = st.sidebar.selectbox("محور الحرارة (X-Axis):", all_cols, index=min(1, len(all_cols)-1))
+    threshold = st.sidebar.slider("درجة الحرارة الحرجة (°C):", 0.0, 100.0, 50.0)
+
+    # تنظيف البيانات المختارة
+    df[x_axis] = pd.to_numeric(df[x_axis], errors='coerce')
+    df[y_axis] = pd.to_numeric(df[y_axis], errors='coerce')
+    df = df.dropna(subset=[x_axis, y_axis])
+
+    # العرض
+    m1, m2, m3 = st.columns(3)
+    m1.metric("أقصى عمق", f"{round(df[y_axis].max(), 1)} m")
+    m2.metric("أقل حرارة", f"{round(df[x_axis].min(), 2)} °C")
+    m3.metric("حالة البئر", "خطر" if df[x_axis].min() < threshold else "آمن")
+
+    # الرسم البياني
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df[x_axis], y=df[y_axis], mode='lines', line=dict(color='#00d4ff')))
+    fig.add_vrect(x0=df[x_axis].min(), x1=threshold, fillcolor="red", opacity=0.1, annotation_text="منطقة الترسيب")
+    fig.update_yaxes(autorange="reversed", title="Depth (m)")
+    fig.update_xaxes(title="Temperature (°C)")
+    fig.update_layout(height=600, template="plotly_dark")
+    st.plotly_chart(fig, use_container_width=True)
     
-    # دالة ذكية لاختيار الأعمدة تلقائياً
-    def find_best(keys, default_idx):
-        for c in all_cols:
-            if any(k.lower() in c.lower() for k in keys): return c
-        return all_cols[default_idx]
-
-    # --- القائمة الجانبية ---
-    st.sidebar.markdown("### 🛠️ Unit & Data Control")
-    depth_col = st.sidebar.selectbox("Select Y-Axis (Depth/Time)", all_cols, 
-                                     index=all_cols.index(find_best(['depth', 'date', 'time'], 0)))
-    temp_col = st.sidebar.selectbox("Select X-Axis (Temperature/Pressure)", all_cols, 
-                                    index=all_cols.index(find_best(['temp', 'press', 'bhp'], 1)))
-    critical_val = st.sidebar.slider("Risk Threshold Value", 0.0, 500.0, 100.0)
-
-    # تنظيف البيانات
-    df[temp_col] = pd.to_numeric(df[temp_col], errors='coerce')
-    df[depth_col] = pd.to_numeric(df[depth_col], errors='coerce')
-    df = df.dropna(subset=[temp_col, depth_col])
-
-    # حسابات المناطق الخطرة
-    danger_zone = df[df[temp_col] < critical_val]
-    
-    # صف المؤشرات (KPIs)
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Max Recorded Value", f"{round(df[depth_col].max(), 1)}")
-    m2.metric("Min Variable Value", f"{round(df[temp_col].min(), 2)}")
-    
-    if not danger_zone.empty:
-        m3.metric("Risk Zone Identified", "YES", delta="ACTION REQ", delta_color="inverse")
-        m4.metric("Risk Status", "⚠️ CRITICAL")
-    else:
-        m3.metric("Risk Zone Identified", "NO", delta="NORMAL")
-        m4.metric("Risk Status", "✅ STABLE")
-
-    st.divider()
-
-    # --- العرض البياني والتحليل ---
-    t1, t2, t3 = st.tabs(["📊 Interactive Analysis", "📜 Project Logic", "📂 Data Inspector"])
-
-    with t1:
-        col_chart, col_side = st.columns([2.5, 1])
-        with col_chart:
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=df[temp_col], y=df[depth_col], mode='lines', 
-                                    name='Well Profile', line=dict(color='#00d4ff', width=2)))
-            
-            # منطقة الخطر
-            fig.add_vrect(x0=df[temp_col].min(), x1=critical_val, fillcolor="red", opacity=0.1, 
-                         layer="below", line_width=0, annotation_text="RISK ZONE")
-            
-            fig.update_yaxes(autorange="reversed", title=depth_col)
-            fig.update_xaxes(title=temp_col)
-            fig.update_layout(height=600, template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', 
-                              plot_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig, use_container_width=True)
-
-        with col_side:
-            st.markdown("### 🤖 Decision Support")
-            if not danger_zone.empty:
-                st.error("⚠️ DEPOSITION ALERT")
-                st.write(f"Parameters dropped below threshold: **{critical_val}**.")
-            else:
-                st.success("✅ SYSTEM STABLE")
-                st.write("Conditions are within the safe operating envelope.")
-
-    with t2:
-        st.markdown(f"""
-        ### Executive Project Summary
-        **Developed by:** Eng. Sulaiman
-        
-        **Objective:** This AI-driven tool monitors real-time production data to prevent NPT 
-        caused by scale, wax, or asphaltene deposition.
-        
-        **Methodology:** Using thermodynamic boundary monitoring to flag anomalies early.
-        """)
-
-    with t3:
-        st.markdown("### Preview of Processed Dataset")
-        st.dataframe(df.head(100), use_container_width=True)
+    st.markdown("### 📑 عينة من البيانات")
+    st.dataframe(df.head(10))
 else:
-    st.error("Fatal Error: Could not connect to Data Source.")
+    st.info("💡 بانتظار توفر البيانات لتوليد المنحنيات والتحليلات.")
