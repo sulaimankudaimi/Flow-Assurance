@@ -17,9 +17,10 @@ def load_data():
 
 # 3. محاولة تشغيل التطبيق
 try:
-    # رفع ملفك يدوياً إلى GitHub بجانب الكود هو الحل الأضمن 100%
-    if "Norway-NA-15_47_9-F-9 A depth.csv" in os.listdir():
+    if os.path.exists("Norway-NA-15_47_9-F-9 A depth.csv"):
         df = pd.read_csv("Norway-NA-15_47_9-F-9 A depth.csv", low_memory=False)
     else:
         st.error("Please upload the CSV file to your GitHub repository!")
         st.stop()
+except Exception as e:
+    st.error(f"Error loading data: {e}")
