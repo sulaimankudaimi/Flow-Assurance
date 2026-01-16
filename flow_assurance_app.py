@@ -6,16 +6,29 @@ import numpy as np
 # 1. إعدادات الصفحة
 st.set_page_config(page_title="Flow Assurance AI", layout="wide")
 
-# 2. دالة تحميل البيانات الذكية
-@st.cache_data
-def load_data():
-    # سنستخدم رابطاً مباشراً لملف Volve لضمان عدم توقف السحابة
-    # إذا كنت رفعت الملف على GitHub، استبدل الرابط برابط الـ Raw الخاص بملفك
-    url = "https://raw.githubusercontent.com/yrahul3910/Volve-Dataset/master/Well_F12_Production_Data.csv" 
-    # ملاحظة: هذا رابط تجريبي، يفضل رفع ملفك الصغير F-9A على GitHub بجانب الكود
-    df = pd.read_csv("Norway-NA-15_47_9-F-9 A depth.csv", low_memory=False)
-    return df
+import streamlit as st
+import pandas as pd
 
+# رابط الملف المباشر من جوجل درايف الذي أنشأته أنت
+file_url = "https://drive.google.com/uc?export=download&id=1WBWBshf28y7Pd2QPE7KFD0mbjI3HI4fl"
+
+@st.cache_data # هذه الوظيفة تمنع إعادة تحميل الملف في كل مرة (تسريع التطبيق)
+def load_data_from_drive(url):
+    try:
+        # قراءة الملف مباشرة من الرابط
+        df = pd.read_csv(url, low_memory=False)
+        return df
+    except Exception as e:
+        st.error(f"⚠️ Error: Could not connect to Google Drive. {e}")
+        return None
+
+# تنفيذ التحميل
+df = load_data_from_drive(file_url)
+
+if df is not None:
+    st.success("✅ Connected to Google Drive - Data Loaded Successfully!")
+    # هنا تضع بقية كود التحليل والرسم البياني الذي كتبناه سابقاً
+    st.dataframe(df.head())
 # 3. محاولة تشغيل التطبيق
 try:
     if os.path.exists("Norway-NA-15_47_9-F-9 A depth.csv"):
